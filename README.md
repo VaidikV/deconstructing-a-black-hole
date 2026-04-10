@@ -79,6 +79,3 @@ Then open `http://localhost:8080`.
 
 - Grain texture, simplex noise, domain warping technique, and animation parameters inspired by **[p5aholic (Keita Yamada)](https://p5aholic.me)**. The original effect uses a pre-rendered blur texture for the shape mask; this project replaces that with a procedural GLSL black hole.
 - Simplex noise implementation by **Ian McEwan and Stefan Gustavson** (Ashima Arts).
-- Educational breakdown, procedural shape mask, and article by **[Vaidik Vadhavana](https://vaidikv.me)**.
-
----
