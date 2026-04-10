@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Deconstructing a Black Hole — A Shader Deep Dive</title>
-  <meta name="description" content="An interactive deep dive into the WebGL fragment shader behind a procedural black hole animation. Simplex noise, domain warping, and GLSL — explained from first principles." />
+  <title>Deconstructing a Black Hole</title>
+  <meta name="description" content="An interactive deep dive into the WebGL fragment shader behind a procedural black hole animation. Simplex noise, domain warping, and GLSL, explained from first principles." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100;0,200;0,300;1,200&family=Inter:ital,wght@0,300;0,400;0,500;1,300&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
@@ -31,9 +31,9 @@
       <p class="article__label">01</p>
       <h2 class="article__heading">What You're Looking At</h2>
       <div class="article__prose">
-        <p>The animation behind this page isn't a video. It isn't a GIF. It isn't pre-rendered. It's a <strong>fragment shader</strong> — a small program running on your GPU right now, computing the color of every pixel on screen, sixty times per second.</p>
-        <p>A fragment shader receives a pixel coordinate and returns a color. That's it. No loops over objects, no scene graph, no physics engine. Just math that maps position to color. The complexity you see — the grain, the swirl, the shape of the black hole — all of it emerges from a few hundred lines of GLSL running in parallel across millions of pixels.</p>
-        <p>This article breaks that shader apart, layer by layer. By the end, you'll understand every line. No prior shader experience required.</p>
+        <p>The animation behind this page is not a video or a GIF or anything pre-rendered. It's a <strong>fragment shader</strong>, a small program running on your GPU right now, computing the color of every pixel on screen sixty times a second.</p>
+        <p>A fragment shader takes in a pixel coordinate and spits out a color. There's no scene graph, no physics, no loop over objects. It's pure math: position goes in, color comes out. All the complexity you see on screen, the grain, the swirl, the shape of the black hole, it all comes from a few hundred lines of GLSL running in parallel across millions of pixels.</p>
+        <p>This article walks through that shader piece by piece. I wrote the explanation I wish I had when I was learning this stuff. You don't need prior shader experience, just some curiosity.</p>
       </div>
     </section>
 
@@ -42,13 +42,13 @@
       <p class="article__label">02</p>
       <h2 class="article__heading">The Setup</h2>
       <div class="article__prose">
-        <p>The renderer is <strong>Three.js</strong> with WebGL. But the 3D engine does almost nothing here — there are no models, no lighting, no materials in the traditional sense. We use Three.js purely as a bridge to get our shader onto the GPU.</p>
+        <p>The renderer is <strong>Three.js</strong> with WebGL. But the 3D engine barely does anything here. There are no models, no lighting, no materials in the traditional sense. Three.js is really just a bridge to get our shader onto the GPU.</p>
         <p>The scene has exactly two objects:</p>
         <ol>
-          <li><strong>A background plane</strong> — a flat rectangle that fills the screen with a solid dark color. Think of it as the "wall" behind the effect.</li>
-          <li><strong>A grain plane</strong> — another flat rectangle layered in front, where the actual shader runs. This plane is transparent — it outputs an alpha channel, so wherever the effect doesn't draw, the dark background shows through.</li>
+          <li><strong>A background plane</strong>: a flat rectangle filling the screen with a solid dark color. Think of it as the wall behind the effect.</li>
+          <li><strong>A grain plane</strong>: another flat rectangle layered in front, where the actual shader runs. This one is transparent. It outputs an alpha channel, so wherever the effect doesn't draw, the dark background shows through.</li>
         </ol>
-        <p>The camera is <strong>orthographic</strong> — no perspective distortion. The grain plane is always the same size on screen regardless of distance. This matters because the shader works in UV coordinates (0 to 1 across the surface), and we need that mapping to be stable.</p>
+        <p>The camera is <strong>orthographic</strong>, so there's no perspective distortion. The grain plane stays the same size on screen regardless of distance. This matters because the shader works in UV coordinates (0 to 1 across the surface), and we need that mapping to stay stable.</p>
       </div>
       <div class="article__code-block">
         <p class="article__code-label">JavaScript — Scene setup</p>
@@ -75,7 +75,7 @@
 );</code></pre>
       </div>
       <div class="article__prose">
-        <p>The vertex shader is a pass-through — it just forwards the UV coordinates to the fragment shader. All the interesting work happens per-pixel.</p>
+        <p>The vertex shader is basically a pass-through. It just forwards the UV coordinates to the fragment shader. All the interesting work happens per-pixel.</p>
       </div>
     </section>
 
@@ -84,8 +84,8 @@
       <p class="article__label">03</p>
       <h2 class="article__heading">Noise</h2>
       <div class="article__prose">
-        <p>The foundation of the entire effect is <strong>simplex noise</strong> — a mathematical function that takes a 2D coordinate and returns a smooth, random-looking value between -1 and 1. Unlike true randomness (which would look like TV static), simplex noise is <em>coherent</em>: nearby points return similar values, creating organic gradients and blobs.</p>
-        <p>We use the Ashima Arts implementation — a well-known open-source simplex noise that runs efficiently on GPUs. The raw function <code>snoise(vec2)</code> returns values in [-1, 1]. We remap it to [0, 1] with a wrapper:</p>
+        <p>The foundation of the entire effect is <strong>simplex noise</strong>. It's a mathematical function that takes a 2D coordinate and returns a smooth, random-looking value between -1 and 1. Unlike true randomness (which would look like TV static), simplex noise is <em>coherent</em>: nearby points return similar values, so you get these organic gradients and blobs instead of pure chaos.</p>
+        <p>We're using the Ashima Arts implementation, a well-known open-source simplex noise that runs efficiently on GPUs. The raw function <code>snoise(vec2)</code> returns values in [-1, 1]. We remap it to [0, 1] with a wrapper:</p>
       </div>
       <div class="article__code-block">
         <p class="article__code-label">GLSL — Noise primitives</p>
@@ -101,9 +101,9 @@
 }</code></pre>
       </div>
       <div class="article__prose">
-        <p><code>noise2d</code> adds time to the input coordinates, which makes the noise drift — this is what creates the slow, evolving motion. The <code>seed</code> uniform is a random number set once on page load, so every visitor sees a unique pattern.</p>
+        <p><code>noise2d</code> adds time to the input coordinates, which is what makes the noise drift and creates that slow, evolving motion. The <code>seed</code> uniform is a random number set once on page load, so every visitor sees a slightly different pattern.</p>
         <h3>Domain Warping</h3>
-        <p>Raw noise looks like blurry blobs. To get the complex, swirling, almost-organic patterns, we use a technique called <strong>domain warping</strong> — we use noise to distort the input of other noise.</p>
+        <p>On its own, raw noise just looks like blurry blobs. To get the complex, swirling, almost-organic patterns you see, we use a technique called <strong>domain warping</strong>. The idea is simple: use noise to distort the input coordinates of other noise.</p>
       </div>
       <div class="article__code-block">
         <p class="article__code-label">GLSL — Domain warping (the pattern function)</p>
@@ -125,7 +125,7 @@
 }</code></pre>
       </div>
       <div class="article__prose">
-        <p>This is noise of noise of noise. Each layer feeds into the next, amplifying the distortion. The magic numbers (<code>5.2</code>, <code>1.3</code>, <code>1.7</code>, <code>9.2</code>...) are arbitrary offsets that prevent the layers from correlating — they just need to be "far apart" in noise space. The result is something that looks like slow turbulence: ink in water, smoke in air.</p>
+        <p>This is noise of noise of noise. Each layer feeds into the next, amplifying the distortion. The magic numbers (<code>5.2</code>, <code>1.3</code>, <code>1.7</code>, <code>9.2</code>...) are arbitrary offsets that prevent the layers from correlating. They just need to be "far apart" in noise space. The result looks like slow turbulence, like ink in water or smoke in still air.</p>
       </div>
       <figure class="article__figure">
         <canvas class="demo-canvas" data-demo="noise"></canvas>
@@ -138,13 +138,13 @@
       <p class="article__label">04</p>
       <h2 class="article__heading">The Grain Texture</h2>
       <div class="article__prose">
-        <p>If domain warping creates the <em>flow</em>, the grain texture creates the <em>texture</em> — the gritty, particulate quality that makes the light look physical rather than digital.</p>
+        <p>If domain warping creates the <em>flow</em>, the grain texture is what creates the <em>texture</em>. It's the gritty, particulate quality that makes the light feel physical rather than digital.</p>
         <p><code>grain.webp</code> is a 1024×1024 image, but it doesn't contain a picture. It encodes two values per pixel:</p>
         <ul>
-          <li><strong>Red channel</strong> — magnitude. How far this particle should scatter from its position.</li>
-          <li><strong>Green channel</strong> — angle. The direction of the scatter, from 0 to 2π.</li>
+          <li><strong>Red channel</strong> stores magnitude: how far this particle should scatter from its position.</li>
+          <li><strong>Green channel</strong> stores angle: the direction of the scatter, from 0 to 2π.</li>
         </ul>
-        <p>Together, they define a <strong>polar displacement vector</strong> for each pixel. The shader samples this texture in pixel space (not UV space), so the grain pattern is density-independent — it looks the same regardless of the mesh size.</p>
+        <p>Together, they define a <strong>polar displacement vector</strong> for each pixel. The shader samples this texture in pixel space (not UV space), so the grain pattern is density-independent. It looks the same regardless of the mesh size.</p>
       </div>
       <div class="article__code-block">
         <p class="article__code-label">GLSL — Grain sampling and polar displacement</p>
@@ -159,8 +159,8 @@
 <span class="kw">float</span> ay = param2 * gr * <span class="fn">sin</span>(gg * <span class="num">2.0</span> * PI);</code></pre>
       </div>
       <div class="article__prose">
-        <p>The <code>pow(grainColor.r, 1.5)</code> compresses the magnitude distribution — most particles scatter a little, a few scatter a lot. The offset <code>ax, ay</code> is then added to the noise coordinates before calling <code>pattern()</code>. This means each pixel evaluates the noise at a slightly different location, breaking up the smooth noise field into a grainy, particulate texture.</p>
-        <p>The term <code>0.5 * (1.0 - blurAlpha)</code> increases scatter outside the shape, which softens the boundary. Inside the shape where <code>blurAlpha = 1</code>, scatter is tighter and the grain is denser.</p>
+        <p><code>pow(grainColor.r, 1.5)</code> compresses the magnitude distribution so that most particles scatter a little and only a few scatter a lot. The offset <code>ax, ay</code> gets added to the noise coordinates before calling <code>pattern()</code>, which means each pixel ends up evaluating the noise at a slightly different location. That's what breaks up the smooth noise field into that grainy, particulate texture.</p>
+        <p>The term <code>0.5 * (1.0 - blurAlpha)</code> increases scatter outside the shape, which softens the boundary. Inside the shape where <code>blurAlpha = 1</code>, scatter is tighter and the grain looks denser.</p>
       </div>
     </section>
 
@@ -169,13 +169,13 @@
       <p class="article__label">05</p>
       <h2 class="article__heading">The Shape</h2>
       <div class="article__prose">
-        <p>The black hole isn't an image. It's not loaded from a file. It's built entirely from math inside the fragment shader — a procedural shape mask called <code>blurAlpha</code>.</p>
+        <p>The black hole shape is not an image. There's no PNG loaded from a file. It's built entirely from math inside the fragment shader as a procedural shape mask called <code>blurAlpha</code>.</p>
         <p>The mask has two components:</p>
         <ol>
-          <li><strong>The ring</strong> — a donut shape with an inner radius (the "hole") and an outer radius that varies with elevation angle, creating the illusion of a 3D torus seen at an angle.</li>
-          <li><strong>The accretion disk</strong> — a thin horizontal band that tapers as it extends outward, like matter spiraling into the black hole.</li>
+          <li><strong>The ring</strong>: a donut shape with an inner radius (the "hole") and an outer radius that varies with elevation angle. This variation is what creates the illusion of a 3D torus seen at an angle.</li>
+          <li><strong>The accretion disk</strong>: a thin horizontal band that tapers as it extends outward, like matter spiraling into the black hole.</li>
         </ol>
-        <p>Before computing the shape, the coordinate system is rotated about 29 degrees and scaled, which tilts the black hole across the viewport.</p>
+        <p>Before computing the shape, we rotate the coordinate system about 29 degrees and scale it, which tilts the black hole across the viewport.</p>
       </div>
       <div class="article__code-block">
         <p class="article__code-label">GLSL — Black hole shape mask</p>
@@ -205,13 +205,13 @@ outerR += equator * equator * <span class="num">0.015</span>;  <span class="cm">
 <span class="kw">float</span> blurAlpha = <span class="fn">max</span>(ring, hBand);</code></pre>
       </div>
       <div class="article__prose">
-        <p><code>smoothstep</code> is the workhorse here. It creates smooth transitions — the ring doesn't have a hard edge, it fades from 0 to 1 over a small range. The inner <code>smoothstep</code> carves out the hole; the outer one fades the ring away. Multiplying them creates the donut.</p>
-        <p>The <code>sinEl</code> trick approximates viewing angle: at the "top" and "bottom" of the ring, the outer radius shrinks; at the "sides" (equator), it's widest. This single line of math creates the illusion that you're looking at a 3D torus from a slight angle.</p>
-        <p>The accretion disk (<code>hBand</code>) is simpler — a horizontal stripe that's thick near the center and tapers to nothing at the edges. <code>max(ring, hBand)</code> combines them: wherever either shape is active, particles are visible.</p>
+        <p><code>smoothstep</code> does most of the heavy lifting here. It creates smooth transitions, so the ring doesn't have a hard edge. Instead it fades from 0 to 1 over a small range. The inner <code>smoothstep</code> carves out the hole, the outer one fades the ring away. Multiplying them together creates the donut.</p>
+        <p>The <code>sinEl</code> trick is how we approximate viewing angle. At the "top" and "bottom" of the ring, the outer radius shrinks. At the "sides" (the equator), it's widest. That one line of math is what sells the illusion of looking at a 3D torus from an angle.</p>
+        <p>The accretion disk (<code>hBand</code>) is simpler, just a horizontal stripe that's thick near the center and tapers to nothing at the edges. <code>max(ring, hBand)</code> combines both: wherever either shape is active, particles show up.</p>
       </div>
       <figure class="article__figure">
         <canvas class="demo-canvas" data-demo="mask"></canvas>
-        <figcaption class="article__caption">The shape mask (blurAlpha) isolated — white where particles are visible, black where they aren't.</figcaption>
+        <figcaption class="article__caption">The shape mask (blurAlpha) isolated. White where particles are visible, black where they aren't.</figcaption>
       </figure>
     </section>
 
@@ -220,8 +220,8 @@ outerR += equator * equator * <span class="num">0.015</span>;  <span class="cm">
       <p class="article__label">06</p>
       <h2 class="article__heading">The Threshold</h2>
       <div class="article__prose">
-        <p>At this point we have a noise value <code>n</code> between 0 and 1 for every pixel. If we used it directly as brightness, we'd see a smooth, cloudy wash of gray. The effect would be soft and lifeless.</p>
-        <p>The threshold step is what gives the grain its character — sparse bright particles against deep darkness.</p>
+        <p>At this point we have a noise value <code>n</code> between 0 and 1 for every pixel. If you used it directly as brightness, you'd see a smooth, cloudy wash of gray. Soft and lifeless.</p>
+        <p>The threshold step is what gives the grain its character. It's the difference between a blurry fog and sparse bright particles against deep darkness.</p>
       </div>
       <div class="article__code-block">
         <p class="article__code-label">GLSL — The contrast curve</p>
@@ -231,10 +231,10 @@ n = <span class="fn">pow</span>(n * <span class="num">1.05</span>, <span class="
 n = <span class="fn">smoothstep</span>(<span class="num">0.0</span>, <span class="num">1.0</span>, n);  <span class="cm">// clamp and smooth</span></code></pre>
       </div>
       <div class="article__prose">
-        <p><code>pow(x, 6.0)</code> is a steep contrast curve. A noise value of 0.5 becomes 0.5<sup>6</sup> = 0.016 — practically invisible. A value of 0.8 becomes 0.8<sup>6</sup> = 0.26 — faintly visible. Only values very close to 1.0 survive with real brightness. The result: most of the noise field goes dark, and only the brightest peaks remain as visible particles.</p>
-        <p>The <code>1.05</code> multiplier is a subtle bias — it pushes all values slightly up before the power function, which controls the overall density of visible grain. Increasing it shows more particles; decreasing it makes the effect sparser.</p>
-        <p>The final <code>smoothstep</code> clamps the result to [0, 1] and adds a slight S-curve, ensuring clean output values for the color mix.</p>
-        <p>This single line — <code>pow(n * 1.05, 6.0)</code> — is arguably the most important line in the shader. It transforms amorphous noise into something that looks like physical particles of light.</p>
+        <p><code>pow(x, 6.0)</code> is a steep contrast curve. A noise value of 0.5 becomes 0.5<sup>6</sup> = 0.016, practically invisible. A value of 0.8 becomes 0.8<sup>6</sup> = 0.26, barely there. Only values very close to 1.0 survive with any real brightness. Most of the noise field goes dark, and only the brightest peaks remain as visible particles.</p>
+        <p>The <code>1.05</code> multiplier is a subtle bias that pushes all values slightly up before the power function. It controls the overall density of visible grain. Bump it up and you get more particles. Lower it and the effect gets sparser.</p>
+        <p>The final <code>smoothstep</code> clamps the result to [0, 1] and adds a slight S-curve, giving us clean output values for the color mix.</p>
+        <p>Honestly, <code>pow(n * 1.05, 6.0)</code> is probably the most important line in the entire shader. It's what transforms amorphous noise into something that actually looks like physical particles of light.</p>
       </div>
     </section>
 
@@ -253,13 +253,13 @@ n = <span class="fn">smoothstep</span>(<span class="num">0.0</span>, <span class
 gl_FragColor = <span class="kw">vec4</span>(result, blurAlpha);</code></pre>
       </div>
       <div class="article__prose">
-        <p><code>mix(back, front, n)</code> is linear interpolation. When <code>n = 0</code> (most pixels), the output is <code>back</code> — the dark background color. When <code>n = 1</code> (the bright grain peaks), the output is <code>front</code> — a warm off-white. Values in between produce subtle grays.</p>
-        <p>The alpha channel is set to <code>blurAlpha</code> — the shape mask. This is the two-layer trick: inside the black hole shape, the grain plane is opaque and the particles are visible. Outside the shape, alpha drops to zero and the grain plane becomes invisible, revealing the solid dark background plane behind it.</p>
-        <p>The result: particles of light that exist only within the geometry of a black hole, flickering and drifting as the noise evolves over time. No images. No pre-rendered frames. Just math, running live on your GPU.</p>
+        <p><code>mix(back, front, n)</code> is linear interpolation. When <code>n = 0</code> (which is most pixels), you get <code>back</code>, the dark background color. When <code>n = 1</code> (the bright grain peaks), you get <code>front</code>, a warm off-white. Anything in between produces subtle grays.</p>
+        <p>The alpha channel gets set to <code>blurAlpha</code>, the shape mask. This is the key to the two-layer trick: inside the black hole shape, the grain plane is opaque and the particles are visible. Outside the shape, alpha drops to zero, the grain plane disappears, and the solid dark background plane behind it shows through.</p>
+        <p>And that's the whole thing. Particles of light that exist only within the geometry of a black hole, flickering and drifting as the noise field evolves. No images, no pre-rendered frames, just math running live on your GPU.</p>
       </div>
       <figure class="article__figure">
         <canvas class="demo-canvas" data-demo="full"></canvas>
-        <figcaption class="article__caption">The complete pipeline — noise, grain displacement, shape mask, threshold, and color compositing, all running together.</figcaption>
+        <figcaption class="article__caption">The complete pipeline: noise, grain displacement, shape mask, threshold, and color compositing, all running together.</figcaption>
       </figure>
     </section>
 
@@ -268,7 +268,7 @@ gl_FragColor = <span class="kw">vec4</span>(result, blurAlpha);</code></pre>
       <p class="article__label">Credits</p>
       <h2 class="article__heading">Credits</h2>
       <div class="article__prose">
-        <p>The grain texture, simplex noise implementation, domain warping technique, and animation parameters are inspired by <strong>p5aholic (Keita Yamada)</strong> and <a href="https://p5aholic.me" target="_blank" rel="noopener">his portfolio</a>. The original effect uses a pre-rendered blur texture for the shape mask — we replaced that with a procedural black hole built entirely in GLSL.</p>
+        <p>The grain texture, simplex noise implementation, domain warping technique, and animation parameters are inspired by <strong>p5aholic (Keita Yamada)</strong> and <a href="https://p5aholic.me" target="_blank" rel="noopener">his portfolio</a>. The original effect uses a pre-rendered blur texture for the shape mask. We replaced that with a procedural black hole built entirely in GLSL.</p>
         <p>The simplex noise is the Ashima Arts implementation by Ian McEwan and Stefan Gustavson.</p>
         <p>The educational breakdown, procedural shape mask, and this article are original work by <a href="https://vaidikv.me" target="_blank" rel="noopener">Vaidik Vadhavana</a>.</p>
       </div>
